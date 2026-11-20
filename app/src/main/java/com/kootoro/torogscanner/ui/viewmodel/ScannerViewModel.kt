@@ -2,6 +2,7 @@ package com.kootoro.torogscanner.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kootoro.torogscanner.data.api.RetrofitClient
@@ -50,6 +51,31 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
 
     private val _zoomRatio = MutableStateFlow(1.0f)
     val zoomRatio: StateFlow<Float> = _zoomRatio.asStateFlow()
+
+    private val _isCameraPaused = MutableStateFlow(false)
+    val isCameraPaused: StateFlow<Boolean> = _isCameraPaused.asStateFlow()
+
+    fun toggleCameraPause() {
+        _isCameraPaused.value = !_isCameraPaused.value
+    }
+
+    // 0: Small (100dp), 1: Medium (140dp), 2: Large (180dp)
+    private val _viewfinderSizeIndex = MutableStateFlow(1)
+    val viewfinderSizeIndex: StateFlow<Int> = _viewfinderSizeIndex.asStateFlow()
+
+    fun cycleViewfinderSize() {
+        _viewfinderSizeIndex.value = (_viewfinderSizeIndex.value + 1) % 3
+    }
+
+    private val _lastScannedItem = MutableStateFlow<ScannedDeviceItem?>(null)
+    val lastScannedItem: StateFlow<ScannedDeviceItem?> = _lastScannedItem.asStateFlow()
+
+    fun reopenLastItem() {
+        _lastScannedItem.value?.let { item ->
+            _singleResult.value = item
+            _showSingleSheet.value = true
+        }
+    }
 
     // ─── PREFIX FILTER ────────────────────────────────────────────────────────
     private val _isFilterEnabled = MutableStateFlow(prefs.getBoolean("filter_enabled", true))
@@ -201,16 +227,80 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                         item.deviceStatus = res.warehouse?.deviceStatus
                         item.inInventory = res.warehouse?.inInventory ?: false
                         _singleResult.value = item.copy()
+                        _lastScannedItem.value = item.copy()
                     } else {
                         item.error = res.error ?: "Lỗi tra cứu ToroG"
                         _singleResult.value = item.copy()
+                        _lastScannedItem.value = item.copy()
                     }
                 }
                 .onFailure { err ->
                     _isSingleLoading.value = false
                     item.error = err.message ?: "Lỗi kết nối máy chủ"
                     _singleResult.value = item.copy()
+                    _lastScannedItem.value = item.copy()
                 }
+        }
+    }
+
+    fun decodeImageUri(context: Context, uri: Uri, isBatch: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val inputImage = com.google.mlkit.vision.common.InputImage.fromFilePath(context, uri)
+                val scanner = com.google.mlkit.vision.barcode.BarcodeScanning.getClient()
+                scanner.process(inputImage)
+                    .addOnSuccessListener { barcodes ->
+                        if (barcodes.isEmpty()) {
+                            viewModelScope.launch {
+                                _uiEvents.emit(UiEvent.ShowToast("Không tìm thấy mã vạch nào trong ảnh"))
+                            }
+                            return@addOnSuccessListener
+                        }
+                        val validList = mutableListOf<String>()
+                        barcodes.forEach { b ->
+                            val raw = b.rawValue ?: ""
+                            val cleaned = BarcodeCleaner.clean(raw)
+                            val isValid = if (_isFilterEnabled.value) {
+                                BarcodeCleaner.isValidSerial(cleaned, _allowedPrefixes.value)
+                            } else cleaned.isNotEmpty()
+                            if (isValid && !validList.contains(cleaned)) {
+                                validList.add(cleaned)
+                            }
+                        }
+                        if (validList.isEmpty()) {
+                            viewModelScope.launch {
+                                _uiEvents.emit(UiEvent.ShowToast("Không có mã nào khớp bộ lọc tiền tố"))
+                            }
+                            return@addOnSuccessListener
+                        }
+                        if (!isBatch) {
+                            lookupSingleSerial(validList.first())
+                        } else {
+                            val currentList = _batchList.value.toMutableList()
+                            var added = 0
+                            validList.forEach { s ->
+                                if (currentList.none { it.serial.equals(s, ignoreCase = true) }) {
+                                    currentList.add(0, ScannedDeviceItem(serial = s))
+                                    added++
+                                }
+                            }
+                            _batchList.value = currentList
+                            feedbackManager.onBatchItemAdded()
+                            viewModelScope.launch {
+                                _uiEvents.emit(UiEvent.ShowToast("Đã trích xuất và thêm $added mã vào danh sách"))
+                            }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        viewModelScope.launch {
+                            _uiEvents.emit(UiEvent.ShowToast("Lỗi đọc ảnh: ${e.message}"))
+                        }
+                    }
+            } catch (e: Exception) {
+                viewModelScope.launch {
+                    _uiEvents.emit(UiEvent.ShowToast("Lỗi mở ảnh: ${e.message}"))
+                }
+            }
         }
     }
 
