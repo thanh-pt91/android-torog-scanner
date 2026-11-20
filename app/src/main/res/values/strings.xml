@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ToroG POS</string>
+    <string name="camera_permission_required">Ứng dụng cần quyền Camera để quét mã vạch thiết bị.</string>
+    <string name="grant_permission">Cấp quyền Camera</string>
+</resources>
