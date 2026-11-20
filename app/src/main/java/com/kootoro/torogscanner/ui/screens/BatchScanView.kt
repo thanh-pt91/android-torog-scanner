@@ -1,7 +1,12 @@
 package com.kootoro.torogscanner.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,6 +80,12 @@ fun BatchScanView(
 
     val context = LocalContext.current
 
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.decodeImageUri(context, it, isBatch = true) }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Upper: Camera View (45% height)
         Box(
@@ -116,6 +127,23 @@ fun BatchScanView(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            // Floating Gallery Button (Bottom-Center)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 10.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(DarkBg.copy(alpha = 0.85f))
+                    .clickable { galleryLauncher.launch("image/*") }
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Image, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Nạp ảnh tem thùng từ Album", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
 
