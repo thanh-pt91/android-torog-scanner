@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -76,6 +78,7 @@ fun MainScreen(viewModel: ScannerViewModel) {
     val selectedTab by viewModel.selectedTab.collectAsState()
     val isTorchOn by viewModel.isTorchOn.collectAsState()
     val zoomRatio by viewModel.zoomRatio.collectAsState()
+    val isCameraPaused by viewModel.isCameraPaused.collectAsState()
     val isFilterEnabled by viewModel.isFilterEnabled.collectAsState()
     val allowedPrefixes by viewModel.allowedPrefixes.collectAsState()
     val userState by viewModel.authManager.userState.collectAsState()
@@ -123,6 +126,15 @@ fun MainScreen(viewModel: ScannerViewModel) {
                     }
                 },
                 actions = {
+                    // Camera Cooling / Power toggle
+                    IconButton(onClick = { viewModel.toggleCameraPause() }) {
+                        Icon(
+                            imageVector = if (isCameraPaused) Icons.Default.VideocamOff else Icons.Default.Videocam,
+                            contentDescription = "Làm mát Camera",
+                            tint = if (isCameraPaused) DangerRed else SuccessGreen
+                        )
+                    }
+
                     // Flash / Torch toggle
                     IconButton(onClick = { viewModel.toggleTorch() }) {
                         Icon(
@@ -244,7 +256,8 @@ fun MainScreen(viewModel: ScannerViewModel) {
             when (selectedTab) {
                 0 -> SingleScanView(
                     viewModel = viewModel,
-                    onOpenPushSheet = { item -> pushSheetItems = listOf(item) }
+                    onOpenPushSheet = { item -> pushSheetItems = listOf(item) },
+                    onOpenManualSearch = { showManualSearchDialog = true }
                 )
                 1 -> BatchScanView(
                     viewModel = viewModel,
