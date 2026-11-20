@@ -1,5 +1,7 @@
 package com.kootoro.torogscanner.ui.screens
 
+import android.app.Activity
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,7 +17,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -39,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,6 +74,11 @@ fun SettingsDialog(
     var prefixInput by remember { mutableStateOf(allowedPrefixes.joinToString(", ")) }
     var isSigningIn by remember { mutableStateOf(false) }
 
+    var showTokenDialog by remember { mutableStateOf(false) }
+    var tokenInput by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+    val activity = context as? Activity
     val coroutineScope = rememberCoroutineScope()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -121,6 +131,7 @@ fun SettingsDialog(
                 Button(
                     onClick = {
                         viewModel.updateServerUrl(urlInput)
+                        Toast.makeText(context, "Đã lưu địa chỉ máy chủ!", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                     shape = RoundedCornerShape(8.dp),
@@ -170,6 +181,7 @@ fun SettingsDialog(
                     onClick = {
                         val list = prefixInput.split(",").map { it.trim().uppercase() }.filter { it.isNotEmpty() }
                         viewModel.updatePrefixes(list)
+                        Toast.makeText(context, "Đã cập nhật bộ lọc tiền tố!", Toast.LENGTH_SHORT).show()
                     },
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -204,7 +216,10 @@ fun SettingsDialog(
 
                             Spacer(modifier = Modifier.height(12.dp))
                             OutlinedButton(
-                                onClick = { viewModel.authManager.signOut() },
+                                onClick = {
+                                    viewModel.authManager.signOut()
+                                    Toast.makeText(context, "Đã đăng xuất Google", Toast.LENGTH_SHORT).show()
+                                },
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = DangerRed),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
@@ -221,11 +236,20 @@ fun SettingsDialog(
 
                             Button(
                                 onClick = {
+                                    if (activity == null) {
+                                        Toast.makeText(context, "Lỗi: Không tìm thấy Activity để mở giao diện Google", Toast.LENGTH_SHORT).show()
+                                        return@Button
+                                    }
                                     val clientId = googleClientId ?: "748872611293-hlqat4fvhtvmjt7bbq1hodd2b16174af.apps.googleusercontent.com"
                                     isSigningIn = true
                                     coroutineScope.launch {
-                                        viewModel.authManager.signIn(clientId)
+                                        val res = viewModel.authManager.signIn(activity, clientId)
                                         isSigningIn = false
+                                        res.onSuccess { user ->
+                                            Toast.makeText(context, "Đăng nhập thành công: ${user.email}", Toast.LENGTH_SHORT).show()
+                                        }.onFailure { err ->
+                                            Toast.makeText(context, err.message ?: "Lỗi đăng nhập", Toast.LENGTH_LONG).show()
+                                        }
                                     }
                                 },
                                 enabled = !isSigningIn,
@@ -238,13 +262,80 @@ fun SettingsDialog(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Đang kết nối Google...")
                                 } else {
-                                    Text("🔑 Đăng nhập Google")
+                                    Text("🔑 Đăng nhập Google (Tài khoản máy)")
                                 }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = { showTokenDialog = true },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(imageVector = Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Nhập ID Token xác thực thủ công", fontSize = 12.sp)
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // Dialog nhập Token thủ công (dự phòng)
+    if (showTokenDialog) {
+        AlertDialog(
+            onDismissRequest = { showTokenDialog = false },
+            title = { Text("Nhập Google ID Token", color = TextPrimary) },
+            text = {
+                Column {
+                    Text(
+                        "Dán Google ID Token để xác thực trực tiếp nếu máy chưa cấu hình Google Play Services:",
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = tokenInput,
+                        onValueChange = { tokenInput = it },
+                        label = { Text("Google ID Token (ey...)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = PrimaryBlue,
+                            unfocusedBorderColor = DarkCard
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val token = tokenInput.trim()
+                        if (token.isEmpty()) return@Button
+                        showTokenDialog = false
+                        coroutineScope.launch {
+                            val res = viewModel.authManager.verifyAndSaveUser(token)
+                            res.onSuccess {
+                                Toast.makeText(context, "Xác thực thành công: ${it.email}", Toast.LENGTH_SHORT).show()
+                            }.onFailure {
+                                Toast.makeText(context, "Lỗi: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                ) {
+                    Text("Xác thực")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showTokenDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
     }
 }
