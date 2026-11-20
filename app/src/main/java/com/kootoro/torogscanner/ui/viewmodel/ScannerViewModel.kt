@@ -259,10 +259,8 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                         val validList = mutableListOf<String>()
                         barcodes.forEach { b ->
                             val raw = b.rawValue ?: ""
-                            val cleaned = BarcodeCleaner.clean(raw)
-                            val isValid = if (_isFilterEnabled.value) {
-                                BarcodeCleaner.isValidSerial(cleaned, _allowedPrefixes.value)
-                            } else cleaned.isNotEmpty()
+                            val cleaned = BarcodeCleaner.cleanBarcode(raw)
+                            val isValid = BarcodeCleaner.isValidSerial(cleaned, _allowedPrefixes.value, _isFilterEnabled.value)
                             if (isValid && !validList.contains(cleaned)) {
                                 validList.add(cleaned)
                             }
@@ -285,7 +283,8 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                                 }
                             }
                             _batchList.value = currentList
-                            feedbackManager.onBatchItemAdded()
+                            feedbackManager.triggerHaptic(45)
+                            feedbackManager.playBeep()
                             viewModelScope.launch {
                                 _uiEvents.emit(UiEvent.ShowToast("Đã trích xuất và thêm $added mã vào danh sách"))
                             }
