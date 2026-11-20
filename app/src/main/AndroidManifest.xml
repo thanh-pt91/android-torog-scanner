@@ -26,12 +26,20 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.ToroGScanner">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Google Web Auth Deep Link: torogscanner://auth?token=... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="torogscanner" android:host="auth" />
             </intent-filter>
         </activity>
 

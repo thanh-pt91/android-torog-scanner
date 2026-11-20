@@ -1,6 +1,9 @@
 package com.kootoro.torogscanner.ui.screens
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,8 +19,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -76,6 +82,7 @@ fun SettingsDialog(
 
     var showTokenDialog by remember { mutableStateOf(false) }
     var tokenInput by remember { mutableStateOf("") }
+    var showNoAccountDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val activity = context as? Activity
@@ -234,6 +241,7 @@ fun SettingsDialog(
                             )
                             Spacer(modifier = Modifier.height(12.dp))
 
+                            // 1. One-tap sign in (if account exists on device)
                             Button(
                                 onClick = {
                                     if (activity == null) {
@@ -248,7 +256,12 @@ fun SettingsDialog(
                                         res.onSuccess { user ->
                                             Toast.makeText(context, "Đăng nhập thành công: ${user.email}", Toast.LENGTH_SHORT).show()
                                         }.onFailure { err ->
-                                            Toast.makeText(context, err.message ?: "Lỗi đăng nhập", Toast.LENGTH_LONG).show()
+                                            val msg = err.message ?: "Lỗi đăng nhập"
+                                            if (msg.contains("Không tìm thấy") || msg.contains("NoCredential")) {
+                                                showNoAccountDialog = true
+                                            } else {
+                                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                            }
                                         }
                                     }
                                 },
@@ -262,12 +275,59 @@ fun SettingsDialog(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Đang kết nối Google...")
                                 } else {
+                                    Icon(imageVector = Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text("🔑 Đăng nhập Google (Tài khoản máy)")
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
+                            // 2. Web Login (Enter Gmail email + password in browser)
+                            Button(
+                                onClick = {
+                                    try {
+                                        val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://torog-scanner-sg.onrender.com/login.html"))
+                                        context.startActivity(webIntent)
+                                        Toast.makeText(context, "Đang mở trình duyệt để nhập email/mật khẩu Google...", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Không mở được trình duyệt: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentCyan.copy(alpha = 0.2f), contentColor = AccentCyan),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(imageVector = Icons.Default.Language, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("🌐 Đăng nhập qua Web (Nhập email & MK)", fontWeight = FontWeight.SemiBold)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // 3. Add Google account to device OS
+                            OutlinedButton(
+                                onClick = {
+                                    try {
+                                        val addAccountIntent = Intent(Settings.ACTION_ADD_ACCOUNT).apply {
+                                            putExtra(Settings.EXTRA_ACCOUNT_TYPES, arrayOf("com.google"))
+                                        }
+                                        context.startActivity(addAccountIntent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Không mở được cài đặt tài khoản: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(imageVector = Icons.Default.AddCircleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("📱 Thêm tài khoản Google vào máy", fontSize = 13.sp)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // 4. Manual token paste fallback
                             OutlinedButton(
                                 onClick = { showTokenDialog = true },
                                 shape = RoundedCornerShape(8.dp),
@@ -275,7 +335,7 @@ fun SettingsDialog(
                             ) {
                                 Icon(imageVector = Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Nhập ID Token xác thực thủ công", fontSize = 12.sp)
+                                Text("✏️ Nhập / Dán Token xác thực thủ công", fontSize = 12.sp)
                             }
                         }
                     }
@@ -334,6 +394,55 @@ fun SettingsDialog(
             dismissButton = {
                 OutlinedButton(onClick = { showTokenDialog = false }) {
                     Text("Hủy")
+                }
+            }
+        )
+    }
+
+    // Dialog thông báo chưa có tài khoản Google trên máy
+    if (showNoAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoAccountDialog = false },
+            title = { Text("Chưa có tài khoản Google", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Điện thoại chưa được cài đặt tài khoản Google trong Cài đặt của Android.\n\nBạn có thể mở trang Web để đăng nhập (nhập email & mật khẩu), hoặc thêm tài khoản Google vào cài đặt máy.",
+                    fontSize = 13.sp,
+                    color = TextPrimary,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showNoAccountDialog = false
+                        try {
+                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://torog-scanner-sg.onrender.com/login.html"))
+                            context.startActivity(webIntent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Lỗi mở Web: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                ) {
+                    Text("🌐 Đăng nhập qua Web")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showNoAccountDialog = false
+                        try {
+                            val addAccountIntent = Intent(Settings.ACTION_ADD_ACCOUNT).apply {
+                                putExtra(Settings.EXTRA_ACCOUNT_TYPES, arrayOf("com.google"))
+                            }
+                            context.startActivity(addAccountIntent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("📱 Thêm vào máy")
                 }
             }
         )

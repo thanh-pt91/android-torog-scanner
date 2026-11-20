@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -55,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kootoro.torogscanner.data.model.ScannedDeviceItem
@@ -81,6 +84,7 @@ fun MainScreen(viewModel: ScannerViewModel) {
     val isCameraPaused by viewModel.isCameraPaused.collectAsState()
     val isFilterEnabled by viewModel.isFilterEnabled.collectAsState()
     val allowedPrefixes by viewModel.allowedPrefixes.collectAsState()
+    val batchList by viewModel.batchList.collectAsState()
     val userState by viewModel.authManager.userState.collectAsState()
 
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -107,40 +111,53 @@ fun MainScreen(viewModel: ScannerViewModel) {
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 2.dp)
+                    ) {
                         Text(
                             text = "ToroG POS",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = TextPrimary
+                            fontSize = 16.sp,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "v1.0",
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = AccentCyan,
                             modifier = Modifier
                                 .background(AccentCyan.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
                 },
                 actions = {
                     // Camera Cooling / Power toggle
-                    IconButton(onClick = { viewModel.toggleCameraPause() }) {
+                    IconButton(
+                        onClick = { viewModel.toggleCameraPause() },
+                        modifier = Modifier.size(36.dp)
+                    ) {
                         Icon(
                             imageVector = if (isCameraPaused) Icons.Default.VideocamOff else Icons.Default.Videocam,
                             contentDescription = "Làm mát Camera",
-                            tint = if (isCameraPaused) DangerRed else SuccessGreen
+                            tint = if (isCameraPaused) DangerRed else SuccessGreen,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
                     // Flash / Torch toggle
-                    IconButton(onClick = { viewModel.toggleTorch() }) {
+                    IconButton(
+                        onClick = { viewModel.toggleTorch() },
+                        modifier = Modifier.size(36.dp)
+                    ) {
                         Icon(
                             imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
                             contentDescription = "Flash",
-                            tint = if (isTorchOn) Color(0xFFFACC15) else TextMuted
+                            tint = if (isTorchOn) Color(0xFFFACC15) else TextMuted,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
@@ -148,13 +165,13 @@ fun MainScreen(viewModel: ScannerViewModel) {
                     Box(
                         modifier = Modifier
                             .clickable { viewModel.cycleZoom() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 2.dp)
                             .background(DarkCard, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = "${zoomRatio}x",
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = AccentCyan
                         )
@@ -164,15 +181,15 @@ fun MainScreen(viewModel: ScannerViewModel) {
                     Box(
                         modifier = Modifier
                             .clickable { viewModel.toggleFilter() }
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = 2.dp)
                             .background(
                                 if (isFilterEnabled) PrimaryBlue.copy(alpha = 0.2f) else DarkCard,
                                 RoundedCornerShape(6.dp)
                             )
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .padding(horizontal = 5.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = if (isFilterEnabled) "🛡️ Lọc (${allowedPrefixes.size})" else "🛡️ Tắt",
+                            text = if (isFilterEnabled) "🛡️ ${allowedPrefixes.size}" else "🛡️ Tắt",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = if (isFilterEnabled) AccentCyan else TextMuted
@@ -180,14 +197,30 @@ fun MainScreen(viewModel: ScannerViewModel) {
                     }
 
                     // Manual Search
-                    IconButton(onClick = { showManualSearchDialog = true }) {
-                        Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = TextPrimary)
+                    IconButton(
+                        onClick = { showManualSearchDialog = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
 
                     // Settings & Auth
-                    IconButton(onClick = { showSettingsDialog = true }) {
+                    IconButton(
+                        onClick = { showSettingsDialog = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
                         Box {
-                            Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = TextPrimary)
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = TextPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
                             // Auth Indicator Dot
                             Box(
                                 modifier = Modifier
@@ -206,53 +239,84 @@ fun MainScreen(viewModel: ScannerViewModel) {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBg)
             )
         },
+        bottomBar = {
+            Surface(
+                color = DarkSurface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+                tonalElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Tab 0: Tra cứu đơn
+                    Button(
+                        onClick = { viewModel.selectTab(0) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedTab == 0) PrimaryBlue else DarkCard
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = "🔍 Tra cứu đơn",
+                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 13.sp,
+                            color = if (selectedTab == 0) Color.White else TextMuted
+                        )
+                    }
+
+                    // Tab 1: Quét hàng loạt
+                    Button(
+                        onClick = { viewModel.selectTab(1) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedTab == 1) PrimaryBlue else DarkCard
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "📦 Quét hàng loạt",
+                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 13.sp,
+                                color = if (selectedTab == 1) Color.White else TextMuted
+                            )
+                            if (batchList.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(AccentCyan, RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = "${batchList.size}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         containerColor = DarkBg
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Tabs: Tra cứu đơn vs Quét hàng loạt
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = DarkSurface,
-                contentColor = PrimaryBlue,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = PrimaryBlue,
-                        height = 3.dp
-                    )
-                }
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { viewModel.selectTab(0) },
-                    text = {
-                        Text(
-                            text = "🔍 Tra cứu đơn",
-                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 14.sp,
-                            color = if (selectedTab == 0) TextPrimary else TextMuted
-                        )
-                    }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { viewModel.selectTab(1) },
-                    text = {
-                        Text(
-                            text = "📦 Quét hàng loạt",
-                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 14.sp,
-                            color = if (selectedTab == 1) TextPrimary else TextMuted
-                        )
-                    }
-                )
-            }
-
-            // Tab Content
             when (selectedTab) {
                 0 -> SingleScanView(
                     viewModel = viewModel,

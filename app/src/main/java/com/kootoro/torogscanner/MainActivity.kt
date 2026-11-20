@@ -1,13 +1,17 @@
 package com.kootoro.torogscanner
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +51,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleAuthDeepLink(intent)
 
         setContent {
             ToroGScannerTheme {
@@ -107,6 +112,28 @@ class MainActivity : ComponentActivity() {
                                 Text("Cấp quyền Camera")
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleAuthDeepLink(intent)
+    }
+
+    private fun handleAuthDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "torogscanner" && data.host == "auth") {
+            val token = data.getQueryParameter("token")
+            if (!token.isNullOrBlank()) {
+                lifecycleScope.launch {
+                    val res = viewModel.authManager.verifyAndSaveUser(token)
+                    res.onSuccess { user ->
+                        Toast.makeText(this@MainActivity, "Đăng nhập Google thành công: ${user.email}", Toast.LENGTH_LONG).show()
+                    }.onFailure { err ->
+                        Toast.makeText(this@MainActivity, "Xác thực Google thất bại: ${err.message}", Toast.LENGTH_LONG).show()
                     }
                 }
             }
